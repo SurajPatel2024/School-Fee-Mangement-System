@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Student Fee Management System</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';">
+   <script>
+window.XLSX = require('xlsx');
+</script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --warning: #f59e0b;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --border: #cbd5e1;
+            --radius: 10px;
+            --shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+        }
+
+        *{
+            margin:0;
+            padding:0;
+            box-sizing:border-box;
+            font-family:'Segoe UI',sans-serif;
+        }
+
+        body{
+            background-color: var(--bg);
+            height: 100vh; 
+            overflow: hidden; /* Stops whole window from scrolling up/down */
+            color:var(--text);
+            display: flex;
+            flex-direction: column;
+            font-size: 13px;
+        }
+
+        .container{
+            max-width:100%;
+            width: 100%;
+            padding: 10px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        header{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--card-bg);
+            padding: 8px 15px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            flex-shrink: 0;
+        }
+
+        header h1{
+            color:var(--primary);
+            font-size:1.4rem;
+        }
+
+        header p{
+            color:#64748b;
+            font-size: 0.85rem;
+        }
+
+        /* Dashboard */
+        .dashboard{
+            display:grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap:10px;
+            flex-shrink: 0;
+        }
+
+        .stat-card{
+            background:var(--card-bg);
+            border-radius:var(--radius);
+            padding:10px 15px;
+            box-shadow:var(--shadow);
+            border-left:4px solid var(--primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stat-card.collected{ border-left-color:var(--success); }
+        .stat-card.pending{ border-left-color:var(--danger); }
+        .stat-card h3{ color:#64748b; font-size:.75rem; text-transform:uppercase; }
+        .stat-card p{ font-size:1.3rem; font-weight:700; color: #0f172a; }
+
+        /* Grid Layout with Absolute Height Constraints */
+        .grid-layout{
+            display:grid;
+            grid-template-columns: 360px 1fr;
+            gap:10px;
+            flex: 1;
+            min-height: 0; 
+            height: calc(100vh - 140px); /* Strict boundary limit for the main grid */
+            align-items: stretch;
+            transition: grid-template-columns 0.3s ease;
+        }
+        
+        .grid-layout.sidebar-hidden {
+            grid-template-columns: 0px 1fr;
+        }
+
+        .sidebar-panel-container {
+            overflow-y: auto; 
+            height: 100%;
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+
+        .grid-layout.sidebar-hidden .sidebar-panel-container {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .panel, .filter-bar, .table-container{
+            background:var(--card-bg);
+            border-radius:var(--radius);
+            box-shadow:var(--shadow);
+            border:1px solid var(--border);
+        }
+
+        .panel{ padding:12px; }
+        
+        /* SIDEBAR TAB MECHANISM */
+        .tab-buttons {
+            display: flex;
+            background: #e2e8f0;
+            border-radius: 8px;
+            padding: 3px;
+            margin-bottom: 10px;
+            gap: 2px;
+        }
+        .tab-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            padding: 6px 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 6px;
+            color: #475569;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+        .tab-btn.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        .panel-header-box {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid var(--border);
+        }
+        h2{ color:var(--primary); font-size: 1.1rem; }
+
+        .toggle-sidebar-btn {
+            background: #f1f5f9;
+            border: 1px solid var(--border);
+            color: #475569;
+            padding: 4px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.8rem;
+            transition: 0.2s;
+        }
+        .toggle-sidebar-btn:hover {
+            background: #e2e8f0;
+            color: var(--primary);
+        }
+
+        /* Forms */
+        .form-group{ display:flex; flex-direction:column; margin-bottom:8px; }
+        .form-group label{ font-size:.75rem; font-weight:600; margin-bottom:3px; }
+        .form-group input, .form-group select, .form-group textarea{
+            padding:8px; border:1px solid var(--border); border-radius:6px; font-size: 0.85rem; background:white;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus{
+            border-color:var(--primary); outline:none;
+        }
+
+        /* Buttons */
+        .btn{ border:none; border-radius:6px; padding:8px 14px; cursor:pointer; color:white; font-weight:600; font-size: 0.85rem; transition:.2s; }
+        .btn:hover{ opacity: 0.9; }
+        .btn-primary{ background: var(--primary); }
+        .btn-success{ background: var(--success); }
+        .btn-danger{ background: var(--danger); }
+        .btn-block{ width:100%; }
+        .btn-container{ display:flex; gap:8px; margin-bottom:5px; flex-shrink: 0; }
+
+        /* Filter bar */
+        .filter-bar{ padding:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; flex-shrink: 0; }
+
+        /* Month Grid */
+        .months-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; width:100%; }
+        .month-box{ display:flex; flex-direction:column; min-width:0; }
+        .month-box input{ width:100%; padding:5px; font-size: 0.8rem; text-align: center; }
+        .month-box label{ font-size:.7rem; margin-bottom:2px; text-align: center; font-weight: bold; }
+
+        /* 🚀 EXPERT FIX: RIGID ENCLOSED SCROLLBOX FOR TABLE */
+        .right-content-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 0;
+            height: 100%;
+            overflow: hidden; /* Restricts wrapper from overflowing */
+        }
+
+        .table-container { 
+            overflow: auto; /* Activates internal independent scrolling */
+            flex-grow: 1;
+            min-height: 0;
+            height: 100%;
+            position: relative;
+            background: var(--card-bg);
+        }
+        
+        table { 
+            width: 100%; 
+            border-collapse: separate; 
+            border-spacing: 0;
+        }
+        
+        /* Fixed Sticky Headers */
+        thead th { 
+            background: #1e293b; 
+            color: white; 
+            position: sticky; 
+            top: 0; 
+            z-index: 20; 
+            font-size: 0.8rem; 
+            padding: 10px; 
+            text-align: left;
+            box-shadow: inset 0 -1px 0 var(--border);
+        }
+        
+        th, td { 
+            padding: 8px 12px; 
+            border-bottom: 1px solid var(--border); 
+            white-space: nowrap; 
+            font-size: 0.85rem; 
+        }
+        
+        tbody tr:nth-child(even) { background-color: #f8fafc; }
+        tbody tr:hover { background-color: #f1f5f9; }
+        mark { background:#e2e8f0; border-radius:4px; padding:1px 4px; font-size: 0.8rem; }
+
+        /* Badges */
+        .badge{ padding:3px 8px; border-radius:4px; font-size:.7rem; font-weight:700; }
+        .badge.paid{ background:#dcfce7; color:#166534; }
+        .badge.pending{ background:#fee2e2; color:#991b1b; }
+        .mini-month-list{ display:grid; grid-template-columns:repeat(6,1fr); gap:2px; width: fit-content; }
+        .month-indicator{ width:8px; height:8px; border-radius:50%; display: inline-block; }
+
+        /* Custom Scrollbar Optimization */
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Modals */
+        .modal{
+            display:none; position:fixed; inset:0; background:rgba(0,0,0,.4);
+            backdrop-filter:blur(3px); justify-content:center; align-items:center; z-index:9999;
+        }
+        .modal-content{
+            width:95%; max-width:550px; background:white; border-radius:12px; padding:15px;
+            box-shadow:0 20px 25px -5px rgba(0,0,0,0.1); animation:popup .2s ease;
+        }
+        @keyframes popup{ from{ transform:scale(.95); opacity:0; } to{ transform:scale(1); opacity:1; } }
+        .modal-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+        .close-btn{ font-size:24px; cursor:pointer; color:#ef4444; }
+        .large-modal{ width:95%; max-width:850px; max-height:95vh; overflow:auto; }
+        .modal-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+        .fee-summary{ margin-top:12px; display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+        .summary-box{ background:#f8fafc; padding:8px; border-radius:8px; text-align:center; border: 1px solid var(--border); }
+        .summary-box span{ display:block; color:#64748b; font-size:.75rem; }
+        .summary-box strong{ font-size:1.1rem; }
+
+        input[type="file"]{ display:none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <button id="show-sidebar-btn" class="toggle-sidebar-btn" style="display: none; background: var(--primary); color: white;" onclick="toggleSidebar()">
+                ▶ Show Sidebar Forms
+            </button>
+            <div>
+                <h1>School Fee Management System</h1>
+              <p>Developed with ❤️ by Suraj Patel</p>
+            </div>
+        </div>
+        <button onclick="window.location.reload()" class="btn btn-primary" style="padding: 5px 12px; font-size: 0.8rem;">
+          🔄 Refresh Page
+        </button>
+    </header>
+
+    <div class="dashboard">
+        <div class="stat-card">
+            <h3>Students</h3>
+            <p id="dash-students">0</p>
+        </div>
+        <div class="stat-card">
+            <h3>Expected</h3>
+            <p id="dash-expected">₹0.00</p>
+        </div>
+        <div class="stat-card collected">
+            <h3>Collected</h3>
+            <p id="dash-collected">₹0.00</p>
+        </div>
+        <div class="stat-card pending">
+            <h3>Remaining</h3>
+            <p id="dash-remaining">₹0.00</p>
+        </div>
+    </div>
+
+    <div class="grid-layout" id="main-grid-layout">
+        <div class="panel sidebar-panel-container">
+            <div class="tab-buttons">
+                <button class="tab-btn active" onclick="switchTab('tab-admission')">👤 Admission</button>
+                <button class="tab-btn" onclick="switchTab('tab-structure')">⚙️ Structure</button>
+                <button class="tab-btn" onclick="switchTab('tab-session')">📁 Session</button>
+                <button class="tab-btn" style="background: #fee2e2; color: #dc2626; max-width: 45px;" onclick="toggleSidebar()" title="Hide Sidebar">◀</button>
+            </div>
+
+            <div id="tab-admission" class="tab-content active">
+                <div class="panel-header-box">
+                    <h2>Student Admission</h2>
+                </div>
+                <form id="student-form" onsubmit="event.preventDefault(); addStudent();">
+                    <div class="form-group">
+                        <label for="stu-id">Student ID</label>
+                        <input type="text" id="stu-id" required placeholder="e.g. 101">
+                    </div>
+                    <div class="form-group">
+                        <label for="stu-name">Student Name</label>
+                        <input type="text" id="stu-name" required placeholder="Aman Kumar">
+                    </div>
+                    <div class="form-group">
+                        <label for="stu-class">Class</label>
+                        <select id="stu-class"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="stu-father">Father's Name</label>
+                        <input type="text" id="stu-father" required placeholder="Mr. Rajesh Kumar">
+                    </div>
+                    <div class="form-group">
+                        <label for="stu-mother">Mother's Name</label>
+                        <input type="text" id="stu-mother" required placeholder="Mrs. Sunita Devi">
+                    </div>
+                    <div class="form-group">
+                        <label for="stu-address">Address</label>
+                        <textarea id="stu-address" rows="1" placeholder="Main Street, City"></textarea>
+                    </div>
+
+                    <label style="font-size: 0.75rem; font-weight: 600; margin-bottom: 4px; display:block;">Month-wise Paid Fee (₹)</label>
+                    <div class="months-grid" id="months-input-container"></div>
+
+                    <button type="submit" class="btn btn-success btn-block" style="margin-top: 10px;">Save Student Record</button>
+                </form>
+            </div>
+
+            <div id="tab-structure" class="tab-content">
+                <div class="panel-header-box">
+                    <h2>Class Fee Structure</h2>
+                </div>
+                <form id="structure-form" onsubmit="event.preventDefault(); saveFeeStructure();">
+                    <div class="form-group">
+                        <label for="struct-class">Select Class</label>
+                        <select id="struct-class" onchange="loadClassStructureFee()"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="struct-fee">Total Yearly Fee (₹)</label>
+                        <input type="number" id="struct-fee" min="0" required placeholder="e.g. 24000">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Set / Update Fee</button>
+                </form>
+            </div>
+
+            <div id="tab-session" class="tab-content">
+                <div class="panel-header-box">
+                    <h2>Session Management</h2>
+                </div>
+                <div class="form-group">
+                    <label for="new-session-input">Session Name</label>
+                    <input type="text" id="new-session-input" placeholder="e.g. 2027-28">
+                </div>
+                <button type="button" class="btn btn-primary btn-block" style="margin-bottom: 6px;" onclick="createNewSession()">➕ Create & Switch</button>
+                <button type="button" class="btn btn-danger btn-block" onclick="triggerSessionDeleteConfirm()">🗑️ Delete Active Session</button>
+            </div>
+        </div>
+
+        <div class="right-content-wrapper">
+            <div class="btn-container">
+                <button class="btn btn-success" onclick="exportToExcel()">📥 Export Excel</button>
+                <label for="import-file" class="btn btn-primary" style="background: #4a5568;">📤 Import Excel</label>
+                <input type="file" id="import-file" accept=".xlsx, .xls" onchange="importFromExcel(this)">
+                <button class="btn btn-danger" onclick="triggerClearAllConfirm()">⚠️ Clear All Data</button>
+            </div>
+
+            <div class="filter-bar">
+                <div class="form-group" style="margin-bottom:0; width: 110px;">
+                    <label style="color:var(--primary); font-weight:bold;">Active Session</label>
+                    <select id="filter-session" onchange="changeSession(this.value)" style="border: 1px solid var(--primary); font-weight: bold; padding: 6px;"></select>
+                </div>
+                <div class="form-group" style="margin-bottom:0; flex: 1; min-width: 120px;">
+                    <label>Search Name / ID</label>
+                    <input type="text" id="filter-search" oninput="updateUI()" placeholder="Search..." style="padding: 6px;">
+                </div>
+                <div class="form-group" style="margin-bottom:0; width: 100px;">
+                    <label>Filter Class</label>
+                    <select id="filter-class" onchange="updateUI()" style="padding: 6px;">
+                        <option value="All">All</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0; width: 100px;">
+                    <label>Status</label>
+                    <select id="filter-status" onchange="updateUI()" style="padding: 6px;">
+                        <option value="All">All</option>
+                        <option value="Paid">Paid</option>
+                        <option value="Pending">Pending</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" style="background:#718096; padding: 6px 12px;" onclick="resetFilters()">Reset</button>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th><th>Name</th><th>Class</th><th>Father's Name</th><th>Mother's Name</th><th>Address</th><th>Total Fee</th><th>Total Paid</th><th>Balance</th><th>Status</th><th>Months (Apr-Mar)</th><th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="student-table-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="editModal" class="modal">
+    <div class="modal-content large-modal">
+        <div class="modal-header">
+            <h2>🎓 Edit Student Record</h2>
+            <span class="close-btn" onclick="closeEditModal()">&times;</span>
+        </div>
+        <input type="hidden" id="edit-original-id">
+        <div class="modal-grid">
+            <div class="form-group"><label>Student ID</label><input type="text" id="edit-id"></div>
+            <div class="form-group"><label>Student Name</label><input type="text" id="edit-name"></div>
+            <div class="form-group"><label>Class</label><select id="edit-class" onchange="updateEditSummary()"></select></div>
+            <div class="form-group"><label>Father Name</label><input type="text" id="edit-father"></div>
+            <div class="form-group"><label>Mother Name</label><input type="text" id="edit-mother"></div>
+            <div class="form-group"><label>Address</label><textarea id="edit-address" rows="1"></textarea></div>
+        </div>
+        <h3 style="margin-top:10px; font-size: 1rem;">💰 Month Wise Fee Details</h3>
+        <div class="months-grid" id="edit-months-grid" style="grid-template-columns: repeat(6, 1fr);"></div>
+        <div class="fee-summary">
+            <div class="summary-box"><span>Total Fee</span><strong id="edit-total-fee">₹0</strong></div>
+            <div class="summary-box"><span>Total Paid</span><strong id="edit-total-paid">₹0</strong></div>
+            <div class="summary-box"><span>Balance</span><strong id="edit-balance">₹0</strong></div>
+            <div class="summary-box"><span>Status</span><strong id="edit-status">Pending</strong></div>
+        </div>
+        <button class="btn btn-success btn-block" style="margin-top: 12px;" onclick="saveEditedStudent()">💾 Save Changes</button>
+    </div>
+</div>
+
+<div id="customConfirmModal" class="modal">
+    <div class="modal-content" style="max-width: 380px; text-align: center;">
+        <h2 style="color: var(--danger); border-bottom: none; margin-bottom: 5px;" id="confirm-modal-title">🚨 Warning</h2>
+        <p style="font-size: 0.9rem; color: #475569;" id="confirm-modal-message">Confirm action?</p>
+        <div style="display: flex; gap: 10px; margin-top: 15px; justify-content: center;" id="confirm-modal-actions">
+            <button class="btn btn-danger" id="confirm-modal-yes-btn">Yes</button>
+            <button class="btn" style="background: #94a3b8;" onclick="closeCustomConfirm()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const academicMonths = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
+    const classesList = ["Nursery", "LKG", "UKG", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
+
+    const defaultFeeTemplate = {
+        "Nursery": 12000, "LKG": 12000, "UKG": 12000, "1": 18000, "2": 18000, "3": 18000, "4": 18000, "5": 18000, "6": 24000, "7": 24000, "8": 24000, "9": 30000, "10": 30000, "11": 36000, "12": 36000
+    };
+
+    let sessionsList = JSON.parse(localStorage.getItem('fee_dynamic_sessions')) || ["2025-26", "2026-27"];
+    let currentSession = localStorage.getItem('current_fee_session') || sessionsList[0];
+
+    let feeStructures = {};
+    let students = [];
+
+    function toggleSidebar() {
+        const gridLayout = document.getElementById('main-grid-layout');
+        const showBtn = document.getElementById('show-sidebar-btn');
+        
+        if (gridLayout.classList.contains('sidebar-hidden')) {
+            gridLayout.classList.remove('sidebar-hidden');
+            showBtn.style.display = 'none';
+        } else {
+            gridLayout.classList.add('sidebar-hidden');
+            showBtn.style.display = 'inline-block';
+        }
+    }
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        
+        document.getElementById(tabId).classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
+
+    function loadSessionData() { 
+        students = JSON.parse(localStorage.getItem(`advanced_fee_students_${currentSession}`)) || []; 
+        feeStructures = JSON.parse(localStorage.getItem(`fee_structures_${currentSession}`)) || { ...defaultFeeTemplate };
+    }
+
+    function init() {
+        updateSessionDropdown();
+
+        const structSelect = document.getElementById('struct-class');
+        const stuClassSelect = document.getElementById('stu-class');
+        const filterClassSelect = document.getElementById('filter-class');
+        const editClass = document.getElementById("edit-class");
+
+        editClass.innerHTML = ''; structSelect.innerHTML = ''; stuClassSelect.innerHTML = '';
+        filterClassSelect.innerHTML = '<option value="All">All</option>';
+
+        classesList.forEach(cls => {
+            editClass.add(new Option(cls, cls)); structSelect.add(new Option(cls, cls));
+            stuClassSelect.add(new Option(cls, cls)); filterClassSelect.add(new Option(cls, cls));
+        });
+
+        const editMonthContainer = document.getElementById("edit-months-grid");
+        editMonthContainer.innerHTML = '';
+        academicMonths.forEach(month => {
+            editMonthContainer.innerHTML += `<div class="month-box"><label>${month}</label><input type="number" id="edit-${month}" value="0" min="0" oninput="updateEditSummary()"></div>`;
+        });
+
+        const monthContainer = document.getElementById('months-input-container');
+        monthContainer.innerHTML = '';
+        academicMonths.forEach(m => {
+            monthContainer.innerHTML += `<div class="month-box"><label>${m}</label><input type="number" id="m-${m}" min="0" value="0"></div>`;
+        });
+
+        loadSessionData(); loadClassStructureFee(); updateUI();
+    }
+
+    function updateSessionDropdown() {
+        const sessionSelect = document.getElementById('filter-session');
+        if (sessionSelect) {
+            sessionSelect.innerHTML = '';
+            sessionsList.forEach(sess => { sessionSelect.add(new Option(sess, sess)); });
+            sessionSelect.value = currentSession;
+        }
+    }
+
+    function openCustomConfirm(title, message, successCallback, isAlertOnly = false) {
+        document.getElementById('confirm-modal-title').innerText = title;
+        document.getElementById('confirm-modal-message').innerText = message;
+        
+        const actionsContainer = document.getElementById('confirm-modal-actions');
+        if (isAlertOnly) {
+            actionsContainer.innerHTML = `<button class="btn btn-primary" onclick="closeCustomConfirm()">OK</button>`;
+        } else {
+            actionsContainer.innerHTML = `
+                <button class="btn btn-danger" id="confirm-modal-yes-btn">Yes</button>
+                <button class="btn" style="background: #94a3b8;" onclick="closeCustomConfirm()">Cancel</button>
+            `;
+            const yesBtn = document.getElementById('confirm-modal-yes-btn');
+            yesBtn.addEventListener('click', () => {
+                successCallback();
+                closeCustomConfirm();
+            });
+        }
+        document.getElementById('customConfirmModal').style.display = 'flex';
+    }
+
+    function closeCustomConfirm() {
+        document.getElementById('customConfirmModal').style.display = 'none';
+    }
+
+    function createNewSession() {
+        const inputField = document.getElementById('new-session-input');
+        const sessionName = inputField.value.trim();
+        if (!sessionName) { return; }
+        if (sessionsList.includes(sessionName)) { changeSession(sessionName); inputField.value = ''; return; }
+        sessionsList.push(sessionName);
+        localStorage.setItem('fee_dynamic_sessions', JSON.stringify(sessionsList));
+        inputField.value = ''; changeSession(sessionName);
+    }
+
+    function triggerSessionDeleteConfirm() {
+        if (sessionsList.length <= 1) { return; }
+        openCustomConfirm(
+            "🗑️ Delete Active Session?",
+            `Kya aap session "${currentSession}" ko delete karna chahte hain?`,
+            function() {
+                localStorage.removeItem(`advanced_fee_students_${currentSession}`);
+                localStorage.removeItem(`fee_structures_${currentSession}`);
+                sessionsList = sessionsList.filter(sess => sess !== currentSession);
+                localStorage.setItem('fee_dynamic_sessions', JSON.stringify(sessionsList));
+                currentSession = sessionsList[0];
+                localStorage.setItem('current_fee_session', currentSession);
+                loadSessionData(); updateSessionDropdown(); loadClassStructureFee(); updateUI();
+            }
+        );
+    }
+
+    function changeSession(newSession) {
+        currentSession = newSession; 
+        localStorage.setItem('current_fee_session', currentSession);
+        updateSessionDropdown(); 
+        loadSessionData(); 
+        loadClassStructureFee(); 
+        updateUI(); 
+    }
+
+    function loadClassStructureFee() {
+        const cls = document.getElementById('struct-class').value;
+        document.getElementById('struct-fee').value = feeStructures[cls] || 0;
+    }
+
+    function saveFeeStructure() {
+        const cls = document.getElementById('struct-class').value;
+        feeStructures[cls] = parseFloat(document.getElementById('struct-fee').value) || 0;
+        localStorage.setItem(`fee_structures_${currentSession}`, JSON.stringify(feeStructures));
+        updateUI();
+    }
+
+    formatINR = (amount) => '₹' + parseFloat(amount).toFixed(0);
+
+    function updateUI() {
+        localStorage.setItem(`advanced_fee_students_${currentSession}`, JSON.stringify(students));
+        const tbody = document.getElementById('student-table-body'); tbody.innerHTML = '';
+        const searchVal = document.getElementById('filter-search').value.toLowerCase().trim();
+        const classVal = document.getElementById('filter-class').value;
+        const statusVal = document.getElementById('filter-status').value;
+
+        let totalExpected = 0, totalCollected = 0, totalRemaining = 0, countedStudents = 0;
+
+        students.forEach((student, index) => {
+            const totalFee = parseFloat(feeStructures[student.class] || 0);
+            let paidFee = 0;
+            academicMonths.forEach(m => { paidFee += parseFloat(student.months[m] || 0); });
+            const balance = totalFee - paidFee;
+            const status = balance <= 0 ? 'Paid' : 'Pending';
+
+            if ((student.name.toLowerCase().includes(searchVal) || student.id.toLowerCase().includes(searchVal)) &&
+                (classVal === 'All' || student.class === classVal) && (statusVal === 'All' || status === statusVal)) {
+                
+                countedStudents++; totalExpected += totalFee; totalCollected += paidFee; totalRemaining += balance;
+
+                let monthIndicatorsHtml = '<div class="mini-month-list">';
+                academicMonths.forEach(m => {
+                    const dotColor = parseFloat(student.months[m] || 0) > 0 ? '#48bb78' : '#cbd5e0';
+                    monthIndicatorsHtml += `<span class="month-indicator" style="background:${dotColor}"></span>`;
+                });
+                monthIndicatorsHtml += '</div>';
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><b>${student.id}</b></td><td>${student.name}</td><td><mark>${student.class}</mark></td><td>${student.fatherName}</td><td>${student.motherName}</td><td>${student.address.substring(0,10)}..</td><td>${formatINR(totalFee)}</td><td style="color:green;">${formatINR(paidFee)}</td><td style="color:red;">${formatINR(balance)}</td><td><span class="badge ${status.toLowerCase()}">${status}</span></td><td>${monthIndicatorsHtml}</td><td><button class="btn btn-primary" style="padding:2px 6px; font-size:0.7rem;" onclick="editStudent('${student.id}')">Edit</button> <button class="btn btn-danger" style="padding:2px 6px; font-size:0.7rem;" onclick="triggerStudentDelete(${index})">Del</button></td>
+                `;
+                tbody.appendChild(row);
+            }
+        });
+        document.getElementById('dash-students').innerText = countedStudents;
+        document.getElementById('dash-expected').innerText = formatINR(totalExpected);
+        document.getElementById('dash-collected').innerText = formatINR(totalCollected);
+        document.getElementById('dash-remaining').innerText = formatINR(totalRemaining);
+    }
+
+    function addStudent() {
+        const id = document.getElementById('stu-id').value.trim();
+        if (students.find(s => s.id.toLowerCase() === id.toLowerCase())) { 
+            openCustomConfirm("❌ ID Already Exists", `Student ID "${id}" pehle se hi saved hai.`, null, true);
+            return; 
+        }
+        let monthsPayload = {};
+        academicMonths.forEach(m => { monthsPayload[m] = parseFloat(document.getElementById(`m-${m}`).value) || 0; });
+        students.push({ id, name: document.getElementById('stu-name').value.trim(), class: document.getElementById('stu-class').value, fatherName: document.getElementById('stu-father').value.trim(), motherName: document.getElementById('stu-mother').value.trim(), address: document.getElementById('stu-address').value.trim(), months: monthsPayload });
+        updateUI(); document.getElementById('student-form').reset(); academicMonths.forEach(m => { document.getElementById(`m-${m}`).value = 0; });
+    }
+
+    function editStudent(id){
+        const student = students.find(s => s.id === id); if(!student) return;
+        academicMonths.forEach(m => { document.getElementById(`edit-${m}`).value = student.months[m] || 0; });
+        document.getElementById("edit-original-id").value = student.id; document.getElementById("edit-id").value = student.id; document.getElementById("edit-name").value = student.name; document.getElementById("edit-class").value = student.class; document.getElementById("edit-father").value = student.fatherName; document.getElementById("edit-mother").value = student.motherName; document.getElementById("edit-address").value = student.address;
+        
+        updateEditSummary();
+        document.getElementById("editModal").style.display = "flex";
+        setTimeout(() => { document.getElementById("edit-name").focus(); }, 50);
+    }
+
+    function closeEditModal(){ 
+        document.getElementById("editModal").style.display = "none"; 
+    }
+
+    function saveEditedStudent() {
+        const oId = document.getElementById("edit-original-id").value;
+        const nId = document.getElementById("edit-id").value.trim();
+        if(students.find(s => s.id === nId && s.id !== oId)){ 
+            openCustomConfirm("❌ ID Already Exists", `Student ID "${nId}" pehle se hi saved hai.`, null, true);
+            return; 
+        }
+        const s = students.find(s => s.id === oId);
+        s.id = nId; s.name = document.getElementById("edit-name").value; s.class = document.getElementById("edit-class").value; s.fatherName = document.getElementById("edit-father").value; s.motherName = document.getElementById("edit-mother").value; s.address = document.getElementById("edit-address").value;
+        academicMonths.forEach(m => { s.months[m] = parseFloat(document.getElementById(`edit-${m}`).value) || 0; });
+        updateUI(); closeEditModal();
+    }
+
+    function updateEditSummary(){
+        const cls = document.getElementById("edit-class").value;
+        const totalFee = parseFloat(feeStructures[cls] || 0);
+        let paid = 0; academicMonths.forEach(m => { paid += parseFloat(document.getElementById(`edit-${m}`).value) || 0; });
+        document.getElementById("edit-total-fee").innerText = formatINR(totalFee); document.getElementById("edit-total-paid").innerText = formatINR(paid); document.getElementById("edit-balance").innerText = formatINR(totalFee - paid); document.getElementById("edit-status").innerText = (totalFee - paid) <= 0 ? "Paid" : "Pending";
+    }
+
+    function triggerStudentDelete(index) { 
+        openCustomConfirm(
+            "🗑️ Delete Record?",
+            "Kya aap is student ka record delete karna chahte hain?",
+            function() { students.splice(index, 1); updateUI(); }
+        );
+    }
+    
+    function resetFilters() { document.getElementById('filter-search').value = ''; document.getElementById('filter-class').value = 'All'; document.getElementById('filter-status').value = 'All'; updateUI(); }
+    
+    function triggerClearAllConfirm() { 
+        openCustomConfirm(
+            "🚨 Clear All Data?",
+            `Kya aap such mein is active session (${currentSession}) ke sabhi students ka record clear karna chahte hain?`,
+            function() { students = []; updateUI(); }
+        );
+    }
+
+    function exportToExcel() {
+        if(students.length === 0) {
+            alert("No student records available to export.");
+            return;
+        }
+        const dataRows = students.map(s => {
+            const totalFee = parseFloat(feeStructures[s.class] || 0);
+            let totalPaid = 0;
+            let rowObj = {
+                "Student ID": s.id,
+                "Student Name": s.name,
+                "Class": s.class, 
+                "Father's Name": s.fatherName,
+                "Mother's Name": s.motherName,
+                "Address": s.address,
+                "Total Yearly Fee": totalFee
+            };
+            academicMonths.forEach(m => {
+                const val = parseFloat(s.months[m] || 0);
+                rowObj[m + " Paid"] = val;
+                totalPaid += val;
+            });
+            rowObj["Total Paid"] = totalPaid;
+            rowObj["Balance Due"] = totalFee - totalPaid;
+            rowObj["Status"] = (totalFee - totalPaid) <= 0 ? "Paid" : "Pending";
+            return rowObj;
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(dataRows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Student Fees");
+
+        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        const { ipcRenderer } = require('electron');
+        ipcRenderer.send('save-excel-dialog', {
+            buffer: excelBuffer,
+            filename: `Student_Fees_Report_${currentSession}.xlsx`
+        });
+    }
+
+    function importFromExcel(element) {
+        const file = element.files[0];
+        if(!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const buffer = new Uint8Array(e.target.result);
+            const wb = XLSX.read(buffer, { type: 'array' });
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            const jsonRows = XLSX.utils.sheet_to_json(sheet);
+
+            if(jsonRows.length === 0) {
+                alert("The Excel file doesn't contain rows.");
+                return;
+            }
+
+            jsonRows.forEach(row => {
+                const id = String(row["Student ID"] || row["id"] || row["ID"] || "").trim();
+                const name = String(row["Student Name"] || row["name"] || row["Name"] || "").trim();
+                let cls = String(row["Class"] || row["class"] || "1").trim();
+
+                const father = String(row["Father's Name"] || row["father"] || "").trim();
+                const mother = String(row["Mother's Name"] || row["mother"] || "").trim();
+                const address = String(row["Address"] || row["address"] || "").trim();
+
+                if(id && name) {
+                    let monthsData = {};
+                    academicMonths.forEach(m => {
+                        monthsData[m] = parseFloat(row[m + " Paid"] || row[m] || 0);
+                    });
+
+                    const existingIndex = students.findIndex(s => s.id === id);
+                    const dataset = { id, name, class: cls, fatherName: father, motherName: mother, address, months: monthsData };
+
+                    if(existingIndex > -1) {
+                        students[existingIndex] = dataset;
+                    } else {
+                        students.push(dataset);
+                    }
+                }
+            });
+
+            updateUI();
+            alert(`Data imported successfully into Session ${currentSession}!`);
+            element.value = '';
+        };
+        reader.readAsArrayBuffer(file);
+    }
+    window.onload = init;
+</script>
+</body>
+</html>

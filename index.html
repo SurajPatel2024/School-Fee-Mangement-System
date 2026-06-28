@@ -763,45 +763,55 @@ window.XLSX = require('xlsx');
         );
     }
 
-    function exportToExcel() {
-        if(students.length === 0) {
-            alert("No student records available to export.");
-            return;
-        }
-        const dataRows = students.map(s => {
-            const totalFee = parseFloat(feeStructures[s.class] || 0);
-            let totalPaid = 0;
-            let rowObj = {
-                "Student ID": s.id,
-                "Student Name": s.name,
-                "Class": s.class, 
-                "Father's Name": s.fatherName,
-                "Mother's Name": s.motherName,
-                "Address": s.address,
-                "Total Yearly Fee": totalFee
-            };
-            academicMonths.forEach(m => {
-                const val = parseFloat(s.months[m] || 0);
-                rowObj[m + " Paid"] = val;
-                totalPaid += val;
-            });
-            rowObj["Total Paid"] = totalPaid;
-            rowObj["Balance Due"] = totalFee - totalPaid;
-            rowObj["Status"] = (totalFee - totalPaid) <= 0 ? "Paid" : "Pending";
-            return rowObj;
-        });
+   
 
-        const worksheet = XLSX.utils.json_to_sheet(dataRows);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Student Fees");
+        function exportToExcel() {
 
-        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-        const { ipcRenderer } = require('electron');
-        ipcRenderer.send('save-excel-dialog', {
-            buffer: excelBuffer,
-            filename: `Student_Fees_Report_${currentSession}.xlsx`
-        });
+    if(students.length === 0){
+        alert("No student records available to export.");
+        return;
     }
+
+    const dataRows = students.map(s => {
+
+        const totalFee = parseFloat(feeStructures[s.class] || 0);
+
+        let totalPaid = 0;
+
+        let rowObj = {
+            "Student ID": s.id,
+            "Student Name": s.name,
+            "Class": s.class,
+            "Father's Name": s.fatherName,
+            "Mother's Name": s.motherName,
+            "Address": s.address,
+            "Total Yearly Fee": totalFee
+        };
+
+        academicMonths.forEach(m=>{
+            const val = parseFloat(s.months[m] || 0);
+            rowObj[m+" Paid"] = val;
+            totalPaid += val;
+        });
+
+        rowObj["Total Paid"] = totalPaid;
+        rowObj["Balance Due"] = totalFee-totalPaid;
+        rowObj["Status"] = (totalFee-totalPaid)<=0 ? "Paid":"Pending";
+
+        return rowObj;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataRows);
+
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(workbook,worksheet,"Student Fees");
+
+    XLSX.writeFile(
+        workbook,
+        `Student_Fees_Report_${currentSession}.xlsx`
+    );
+}
 
     function importFromExcel(element) {
         const file = element.files[0];
